@@ -165,6 +165,62 @@ NOTE: 简单解释一下`systemctl enable gcs`和`systemctl disable gcs`的原�
 `systemctl disable gcs`会删除这个软连接。这个软连接的作用是在`multi-user.target`启动的时候启动`gcs`
 而`Linux`系统启动的时候会启动`multi-user.target`，所以`gcs`也能在开机的时候自动启动。
 
+# Add command_checker and setup_logger to script/deploy_helper.py
+`pr`的链接：[gcs-pull-17](https://github.com/CMIPT/gcs-back-end/pull/17)
+
+本次`pr`修改了`script/deploy_helper.py`，增加了日志功能。在执行`deploy_helper.py`时，如果命令执行失败，
+会输出执行失败的命令的日志信息，包括时间，日志等级，行号，执行失败的命令。
+
+```python
+import logging
+import inspect
+```
+首先，实现这个`pr`的功能，需要导入`logging`和`inspect`模块。`logging`模块是`Python`内置的日志模块，
+`inspect`模块是`Python`内置模块，在这里用于获取命令的行号。
+
+```python
+def setup_logger(log_level=logging.INFO):
+    """
+    Configure the global logging system.
+
+    :param log_level: Set the logging level, defaulting to INFO.
+    """
+    logging.basicConfig(level=log_level,
+                        format='%(asctime)s -%(levelname)s- in %(pathname)s:%(caller_lineno)d: %(message)s', 
+                        datefmt='%Y-%m-%d %H:%M:%S')
+```
+`setup_logger`函数用于配置全局的日志系统。`log_level`参数用于设置日志级别，默认为`INFO`。`logging.basicConfig`
+定义输出日志的格式，包括时间，日志等级，行号，执行失败的命令。
+
+```python
+def command_checker(status_code: int, message: str, expected_code: int = 0):
+    """
+    Check if the command execution status code meets the expected value.
+
+    :param status_code: The actual status code of the command execution.
+    :param message: The log message to be recorded.
+    :param expected_code: The expected status code, defaulting to 0.
+    """
+    if status_code != expected_code:
+        caller_frame = inspect.currentframe().f_back
+        logging.error(message, extra={'caller_lineno': caller_frame.f_lineno})
+        exit(status_code)
+```
+`command_checker`用于比较命令执行返回的状态码与期望的状态码是否一致，如果不一致，则说明命令执行失败，
+则打印出相应的日志，且返回状态码，如果一致则说明命令执行成功，不做任何操作。
+- `status_code`: 命令执行的实际状态码
+- `message`: 要打印的日志信息
+- `expected_code`: 期望的状态码，默认为0
+
+```python
+message_tmp = '''\
+The command below failed:
+    {0}
+Expected status code 0, got status code {1}
+'''
+```
+`message_tmp`是一个模板字符串，用于格式化输出日志信息，在这里会将执行失败的命令和状态码输出到日志中。
+
 # Remove unsed dependency and add doc for configuration
 `pr`的链接：[gcs-pull-22](https://github.com/CMIPT/gcs-back-end/pull/22)
 
